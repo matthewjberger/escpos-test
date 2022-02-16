@@ -1,8 +1,4 @@
-# Dependencies:
-# pip3 install python-escpos
-
-from multiprocessing import dummy
-from escpos.printer import Network, Dummy
+from escpos.printer import Network
 import base64
 import os
 
