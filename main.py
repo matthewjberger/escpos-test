@@ -2,21 +2,50 @@ from escpos import *
 from PIL import Image
 from io import BytesIO
 import base64
-import os
+import threading
 
-def print_chit(ip_address, base64_image):
-    pilImg = Image.open(BytesIO(base64.b64decode(base64_image)))
 
-    lpt = printer.Network(ip_address)
-    print(lpt.paper_status())
-    print(lpt.is_online())
-        
-    lpt.image(pilImg)
-    lpt.cut()
+class Printer:
+    _lock = threading.Lock()
 
-def print_image(printer_ip_address, path):
-    with open(path, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read())
-        print_chit(printer_ip_address, encoded_string)
+    def __init__(self, ip_address, port=9100) -> None:
+        self.printer = printer.Network(ip_address, port)
 
-print_image("192.168.1.40", "chit.png")
+    def paper_status(self):
+        self.printer.paper_status()
+
+    def is_online(self):
+        self.printer.is_online()
+
+    def print_file(self, path, thread_id):
+        with self._lock:
+            with open(path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read())
+                image = Image.open(BytesIO(base64.b64decode(base64_image)))
+                print(f"[Thread {thread_id}] Printing chit...")
+                self.printer.image(image)
+                self.printer.cut()
+                print(f"[Thread {thread_id}] Printing succeeded.")
+
+
+printer = Printer("192.168.0.172")
+
+
+class print_thread(threading.Thread):
+    def __init__(self, threadID, name):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.name = name
+
+    def run(self):
+        printer.print_file("chit.png", self.threadID)
+
+
+threads = list()
+for index in range(3):
+    thread = print_thread("Thread " + str(index), index, )
+    threads.append(thread)
+    thread.start()
+
+for thread in threads:
+    thread.join()
